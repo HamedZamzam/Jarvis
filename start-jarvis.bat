@@ -1,87 +1,98 @@
 @echo off
+chcp 65001 >nul 2>&1
 title Jarvis - Voice to Tasks
+
 echo.
 echo  ========================================
 echo   Jarvis - Voice to Tasks
 echo  ========================================
 echo.
 
-:: Find Node.js
-set "NODEPATH="
-if exist "C:\Program Files\nodejs\node.exe" set "NODEPATH=C:\Program Files\nodejs"
-if exist "C:\Program Files (x86)\nodejs\node.exe" set "NODEPATH=C:\Program Files (x86)\nodejs"
+REM Add Node.js to PATH
+set "PATH=C:\Program Files\nodejs;%PATH%"
 
-if "%NODEPATH%"=="" (
-    echo  ERROR: Node.js not found!
-    echo  Please install Node.js from: https://nodejs.org
+REM Verify node works
+node --version >nul 2>&1
+if errorlevel 1 (
+    echo  ERROR: Node.js is not installed!
+    echo  Download it from: https://nodejs.org
     echo.
     pause
     exit /b 1
 )
 
-echo  Found Node.js at: %NODEPATH%
-set "PATH=%NODEPATH%;%PATH%"
+echo  Node.js found.
 
-:: Go to app directory
+REM Go to the folder where this bat file lives
 cd /d "%~dp0"
 
-:: Check if node_modules exists
-if not exist "node_modules" (
+REM Install dependencies if needed
+if not exist "node_modules\next" (
     echo.
-    echo  Installing dependencies (first time only)...
-    echo  This may take a few minutes...
+    echo  Installing dependencies... please wait a few minutes...
     echo.
     call npm install
     if errorlevel 1 (
-        echo  ERROR: Failed to install dependencies
+        echo.
+        echo  ERROR: npm install failed.
         pause
         exit /b 1
     )
+    echo.
+    echo  Dependencies installed!
+    echo.
 )
 
-:: Check if .env.local exists
+REM Create .env.local if missing
 if not exist ".env.local" (
     echo.
-    echo  ========================================
-    echo   FIRST TIME SETUP
-    echo  ========================================
+    echo  ================================================
+    echo   FIRST TIME SETUP - API Keys Required
+    echo  ================================================
     echo.
-    echo  You need to create a .env.local file with your API keys.
-    echo  I'll create one for you now. Please edit it with your keys.
+    echo  A config file will open in Notepad.
+    echo  Replace the placeholder values with your real keys.
+    echo  Then SAVE the file and run this script again.
     echo.
     copy ".env.local.example" ".env.local" >nul
-    echo  Created .env.local - please edit it with your API keys!
-    echo  File location: %CD%\.env.local
+    start /wait notepad "%~dp0.env.local"
     echo.
-    echo  Open it in Notepad and fill in your keys, then run this again.
-    notepad ".env.local"
+    echo  Config saved. Run this file again to start Jarvis.
     pause
     exit /b 0
 )
 
-:: Build the app if not built yet
-if not exist ".next" (
+REM Clean build
+if not exist ".next\BUILD_ID" (
     echo.
-    echo  Building the app (first time only)...
+    echo  Building the app... this takes about 1-2 minutes...
     echo.
     call npx next build
     if errorlevel 1 (
-        echo  ERROR: Build failed
+        echo.
+        echo  ERROR: Build failed. Check your .env.local file.
         pause
         exit /b 1
     )
+    echo.
+    echo  Build complete!
+)
+
+REM Kill anything on port 3000
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr :3000 ^| findstr LISTENING 2^>nul') do (
+    taskkill /PID %%a /F >nul 2>&1
 )
 
 echo.
-echo  Starting Jarvis...
-echo.
 echo  ========================================
-echo   Open your browser and go to:
-echo   http://localhost:3000
+echo   Jarvis is starting...
+echo   Open: http://localhost:3000
 echo  ========================================
-echo.
-echo  Press Ctrl+C to stop the server.
 echo.
 
-:: Start the server
+REM Open browser after 3 seconds
+start /b cmd /c "timeout /t 3 /nobreak >nul && start http://localhost:3000"
+
+REM Start the server
 call npx next start -p 3000
+pause
