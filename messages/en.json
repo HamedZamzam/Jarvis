@@ -1,0 +1,81 @@
+{
+  "app": {
+    "name": "Jarvis",
+    "tagline": "Voice to Tasks"
+  },
+  "nav": {
+    "home": "Home",
+    "tasks": "Tasks",
+    "topics": "Topics",
+    "settings": "Settings"
+  },
+  "record": {
+    "tap": "Tap to Record",
+    "recording": "Recording...",
+    "stop": "Tap to Stop",
+    "transcribing": "Transcribing...",
+    "extracting": "Extracting tasks...",
+    "done": "Tasks extracted!",
+    "error": "Something went wrong. Try again.",
+    "noMic": "Microphone access denied"
+  },
+  "task": {
+    "title": "Task",
+    "pending": "Pending",
+    "inProgress": "In Progress",
+    "completed": "Completed",
+    "all": "All",
+    "assignee": "Assignee",
+    "dueDate": "Due Date",
+    "reminder": "Reminder",
+    "notes": "Notes",
+    "noTasks": "No tasks yet. Tap the mic to start!",
+    "save": "Save Tasks",
+    "edit": "Edit",
+    "delete": "Delete",
+    "addManual": "Add task manually"
+  },
+  "topic": {
+    "title": "Topics",
+    "general": "General",
+    "create": "New Topic",
+    "name": "Topic Name",
+    "color": "Color",
+    "noTopics": "No topics yet",
+    "selectTopic": "Select topic"
+  },
+  "share": {
+    "title": "Share",
+    "whatsapp": "WhatsApp",
+    "copy": "Copy Text",
+    "share": "Share...",
+    "copied": "Copied!"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "notifications": "Notifications",
+    "enableNotifications": "Enable push notifications",
+    "account": "Account",
+    "signOut": "Sign Out"
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "email": "Email",
+    "password": "Password",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?",
+    "error": "Invalid email or password"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "loading": "Loading...",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "overdue": "Overdue"
+  }
+}
