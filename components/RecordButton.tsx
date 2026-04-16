@@ -76,20 +76,27 @@ export default function RecordButton({ language, onTasksExtracted }: RecordButto
         throw new Error('No speech detected');
       }
 
-      // Step 2: Extract tasks
+      // Step 2: Extract tasks (if Claude API fails, create a single task from transcript)
       setState('extracting');
-      const extractRes = await fetch('/api/extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript, language }),
-      });
+      let tasks;
+      try {
+        const extractRes = await fetch('/api/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript, language }),
+        });
 
-      if (!extractRes.ok) {
-        const err = await extractRes.json();
-        throw new Error(err.error || 'Extraction failed');
+        if (extractRes.ok) {
+          const data = await extractRes.json();
+          tasks = data.tasks;
+        }
+      } catch {}
+
+      // Fallback: if extraction failed, create one task from the full transcript
+      if (!tasks || tasks.length === 0) {
+        tasks = [{ title: transcript.substring(0, 200), description: transcript }];
       }
 
-      const { tasks } = await extractRes.json();
       onTasksExtracted(tasks, transcript);
       setState('idle');
     } catch (err: unknown) {
