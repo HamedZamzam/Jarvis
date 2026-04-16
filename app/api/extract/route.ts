@@ -1,27 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const SYSTEM_PROMPT = `You are Jarvis, a smart task extraction assistant. Your job is to extract clear, actionable tasks from voice transcripts.
+const SYSTEM_PROMPT = `You are Jarvis, a smart task extraction assistant. Extract clear, actionable tasks from voice transcripts.
 
 Rules:
 - Extract ONLY actionable tasks (things someone needs to DO)
-- Each task should have a clear, concise title
+- Each task has a clear, concise title
 - If a person is mentioned as responsible, include them as assignee
 - If a deadline or date is mentioned, include it as due_date in YYYY-MM-DD format
-- If description adds useful context beyond the title, include it
-- Respond ONLY with a valid JSON array, no other text
+- If description adds useful context, include it
+- Respond ONLY with a valid JSON array, no other text or markdown
 - Output language should match the transcript language
 
 Output format:
 [
-  {
-    "title": "string (concise action title)",
-    "description": "string or null (extra context if needed)",
-    "assignee": "string or null (person responsible)",
-    "due_date": "string YYYY-MM-DD or null"
-  }
+  { "title": "...", "description": "...", "assignee": "...", "due_date": "YYYY-MM-DD" }
 ]
 
-If no actionable tasks are found, return an empty array: []`;
+If no actionable tasks, return an empty array: []`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,8 +26,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No transcript provided' }, { status: 400 });
     }
 
-    // Use native fetch instead of Anthropic SDK to avoid node-fetch ECONNRESET
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const baseUrl = process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com';
+    const model = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
+
+    const response = await fetch(`${baseUrl}/v1/messages`, {
       method: 'POST',
       headers: {
         'x-api-key': process.env.ANTHROPIC_API_KEY || '',
@@ -40,7 +37,7 @@ export async function POST(req: NextRequest) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model,
         max_tokens: 1024,
         system: SYSTEM_PROMPT,
         messages: [
@@ -62,7 +59,6 @@ export async function POST(req: NextRequest) {
 
     const message = await response.json();
 
-    // Parse response
     const responseText = message.content
       ?.filter((block: { type: string }) => block.type === 'text')
       .map((block: { type: string; text: string }) => block.text)
@@ -72,6 +68,10 @@ export async function POST(req: NextRequest) {
     if (jsonStr.startsWith('```')) {
       jsonStr = jsonStr.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();
     }
+
+    // Extract JSON array if there's extra text
+    const arrayMatch = jsonStr.match(/\[[\s\S]*\]/);
+    if (arrayMatch) jsonStr = arrayMatch[0];
 
     const tasks = JSON.parse(jsonStr);
 

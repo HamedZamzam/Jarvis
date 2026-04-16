@@ -5,6 +5,7 @@ import { Mic, Square, Loader2 } from 'lucide-react';
 import { useApp } from '@/lib/context';
 import { t } from '@/lib/i18n';
 import { AudioRecorder } from '@/lib/recorder';
+import { BrowserSpeechRecognizer, isSpeechRecognitionSupported } from '@/lib/speech';
 import Waveform from './Waveform';
 import type { ExtractedTask } from '@/lib/types';
 
@@ -20,17 +21,34 @@ export default function RecordButton({ language, onTasksExtracted }: RecordButto
   const [state, setState] = useState<RecordState>('idle');
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState('');
+  const [liveTranscript, setLiveTranscript] = useState('');
   const recorderRef = useRef<AudioRecorder | null>(null);
+  const speechRef = useRef<BrowserSpeechRecognizer | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
 
+  const useBrowserSpeech = isSpeechRecognitionSupported();
+
   const startRecording = useCallback(async () => {
     setError('');
+    setLiveTranscript('');
+
     try {
+      // Start audio recorder (for waveform + fallback)
       const recorder = new AudioRecorder();
       recorderRef.current = recorder;
       await recorder.start();
       setAnalyser(recorder.getAnalyser());
+
+      // Start browser speech recognition if available
+      if (useBrowserSpeech) {
+        const speech = new BrowserSpeechRecognizer(language, (result) => {
+          setLiveTranscript(result.transcript);
+        });
+        speech.start();
+        speechRef.current = speech;
+      }
+
       setState('recording');
       setDuration(0);
 
@@ -40,7 +58,7 @@ export default function RecordButton({ language, onTasksExtracted }: RecordButto
     } catch {
       setError(t(lang, 'record.noMic'));
     }
-  }, [lang]);
+  }, [lang, language, useBrowserSpeech]);
 
   const stopRecording = useCallback(async () => {
     if (!recorderRef.current) return;
@@ -51,32 +69,43 @@ export default function RecordButton({ language, onTasksExtracted }: RecordButto
     }
 
     try {
+      // Stop audio recorder
       const audioBlob = await recorderRef.current.stop();
       setAnalyser(null);
 
-      // Step 1: Transcribe
-      setState('transcribing');
-      const formData = new FormData();
-      formData.append('audio', audioBlob, 'recording.webm');
-      formData.append('language', language);
+      let transcript = '';
 
-      const transcribeRes = await fetch('/api/transcribe', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!transcribeRes.ok) {
-        const err = await transcribeRes.json();
-        throw new Error(err.error || 'Transcription failed');
+      // Try browser speech recognition first (free, instant)
+      if (speechRef.current) {
+        setState('transcribing');
+        transcript = await speechRef.current.stop();
+        speechRef.current = null;
       }
 
-      const { text: transcript } = await transcribeRes.json();
+      // Fallback to Whisper API if no transcript and OpenAI configured
+      if (!transcript || transcript.trim().length === 0) {
+        setState('transcribing');
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.webm');
+        formData.append('language', language);
+
+        try {
+          const transcribeRes = await fetch('/api/transcribe', {
+            method: 'POST',
+            body: formData,
+          });
+          if (transcribeRes.ok) {
+            const data = await transcribeRes.json();
+            transcript = data.text || '';
+          }
+        } catch {}
+      }
 
       if (!transcript || transcript.trim().length === 0) {
-        throw new Error('No speech detected');
+        throw new Error('No speech detected. Please try again.');
       }
 
-      // Step 2: Extract tasks (if Claude API fails, create a single task from transcript)
+      // Extract tasks with AI (gracefully fall back to single task)
       setState('extracting');
       let tasks;
       try {
@@ -92,13 +121,14 @@ export default function RecordButton({ language, onTasksExtracted }: RecordButto
         }
       } catch {}
 
-      // Fallback: if extraction failed, create one task from the full transcript
+      // Fallback: single task from transcript
       if (!tasks || tasks.length === 0) {
-        tasks = [{ title: transcript.substring(0, 200), description: transcript }];
+        tasks = [{ title: transcript.substring(0, 200), description: transcript.length > 200 ? transcript : undefined }];
       }
 
       onTasksExtracted(tasks, transcript);
       setState('idle');
+      setLiveTranscript('');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : t(lang, 'record.error'));
       setState('idle');
@@ -126,6 +156,13 @@ export default function RecordButton({ language, onTasksExtracted }: RecordButto
       {/* Waveform */}
       <Waveform analyser={analyser} isRecording={state === 'recording'} />
 
+      {/* Live transcript preview */}
+      {state === 'recording' && liveTranscript && (
+        <div className="max-w-md w-full px-4 py-3 rounded-xl bg-jarvis-50 border border-jarvis-200 text-sm">
+          <p className="text-[var(--foreground)]">{liveTranscript}</p>
+        </div>
+      )}
+
       {/* Record Button */}
       <button
         onClick={handleClick}
@@ -141,7 +178,6 @@ export default function RecordButton({ language, onTasksExtracted }: RecordButto
           }
         `}
       >
-        {/* Outer ring when recording */}
         {state === 'recording' && (
           <span className="absolute inset-0 rounded-full border-4 border-record/30 animate-ping" />
         )}
