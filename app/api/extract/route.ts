@@ -1,15 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Anthropic from '@anthropic-ai/sdk';
 
-export async function POST(req: NextRequest) {
-  try {
-    const { transcript, language } = await req.json();
-
-    if (!transcript || typeof transcript !== 'string') {
-      return NextResponse.json({ error: 'No transcript provided' }, { status: 400 });
-    }
-
-    const systemPrompt = `You are Jarvis, a smart task extraction assistant. Your job is to extract clear, actionable tasks from voice transcripts.
+const SYSTEM_PROMPT = `You are Jarvis, a smart task extraction assistant. Your job is to extract clear, actionable tasks from voice transcripts.
 
 Rules:
 - Extract ONLY actionable tasks (things someone needs to DO)
@@ -32,29 +23,51 @@ Output format:
 
 If no actionable tasks are found, return an empty array: []`;
 
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: `Extract action items from this transcript:\n\n${transcript}`,
-        },
-      ],
+export async function POST(req: NextRequest) {
+  try {
+    const { transcript, language } = await req.json();
+
+    if (!transcript || typeof transcript !== 'string') {
+      return NextResponse.json({ error: 'No transcript provided' }, { status: 400 });
+    }
+
+    // Use native fetch instead of Anthropic SDK to avoid node-fetch ECONNRESET
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': process.env.ANTHROPIC_API_KEY || '',
+        'content-type': 'application/json',
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        system: SYSTEM_PROMPT,
+        messages: [
+          {
+            role: 'user',
+            content: `Extract action items from this transcript:\n\n${transcript}`,
+          },
+        ],
+      }),
     });
 
-    // Parse Claude's response
-    const responseText = message.content
-      .filter((block) => block.type === 'text')
-      .map((block) => {
-        if (block.type === 'text') return block.text;
-        return '';
-      })
-      .join('');
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: err.error?.message || 'Extraction failed' },
+        { status: response.status }
+      );
+    }
 
-    // Extract JSON from response (handle potential markdown wrapping)
+    const message = await response.json();
+
+    // Parse response
+    const responseText = message.content
+      ?.filter((block: { type: string }) => block.type === 'text')
+      .map((block: { type: string; text: string }) => block.text)
+      .join('') || '';
+
     let jsonStr = responseText.trim();
     if (jsonStr.startsWith('```')) {
       jsonStr = jsonStr.replace(/```json?\n?/g, '').replace(/```$/g, '').trim();

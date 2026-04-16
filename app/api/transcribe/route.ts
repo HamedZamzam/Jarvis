@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,20 +10,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No audio file provided' }, { status: 400 });
     }
 
-    // Max 25MB (Whisper limit)
     if (audioFile.size > 25 * 1024 * 1024) {
       return NextResponse.json({ error: 'Audio file too large (max 25MB)' }, { status: 400 });
     }
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const transcription = await openai.audio.transcriptions.create({
-      model: 'whisper-1',
-      file: audioFile,
-      language: language === 'ar' ? 'ar' : 'en',
+    // Use native fetch instead of OpenAI SDK to avoid node-fetch ECONNRESET
+    const openaiForm = new FormData();
+    openaiForm.append('file', audioFile, 'recording.webm');
+    openaiForm.append('model', 'whisper-1');
+    openaiForm.append('language', language === 'ar' ? 'ar' : 'en');
+
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: openaiForm,
     });
 
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: { message: 'Transcription failed' } }));
+      return NextResponse.json(
+        { error: err.error?.message || 'Transcription failed' },
+        { status: response.status }
+      );
+    }
+
+    const result = await response.json();
+
     return NextResponse.json({
-      text: transcription.text,
+      text: result.text,
       language,
     });
   } catch (error: unknown) {
