@@ -13,17 +13,24 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
     setLoading(true);
 
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
+        // Supabase may require email confirmation
+        if (data.user && !data.session) {
+          setSuccess('Check your email for a confirmation link!');
+          return;
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -85,6 +92,9 @@ export default function LoginPage() {
 
           {error && (
             <p className="text-red-500 text-sm text-center">{error}</p>
+          )}
+          {success && (
+            <p className="text-green-500 text-sm text-center">{success}</p>
           )}
 
           <button
