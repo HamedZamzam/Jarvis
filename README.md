@@ -56,7 +56,7 @@ You need 4 free accounts:
 | Variable | Value |
 |----------|-------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Your Supabase anon key |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Your Supabase anon key |
 | `OPENAI_API_KEY` | Your OpenAI API key |
 | `ANTHROPIC_API_KEY` | Your Anthropic API key |
 

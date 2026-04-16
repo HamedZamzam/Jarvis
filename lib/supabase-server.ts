@@ -7,7 +7,7 @@ export async function createServerSupabase() {
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://localhost',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'missing-key',
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'missing-key',
     {
       cookies: {
         get(name: string) {
