@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import webPush from 'web-push';
 
-// Use service role for cron (no user context)
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+  );
+}
 
 export async function GET(req: Request) {
   // Verify cron secret (Vercel cron sends this header)
@@ -21,7 +22,7 @@ export async function GET(req: Request) {
   try {
     // Find tasks with due reminders
     const now = new Date().toISOString();
-    const { data: tasks, error } = await supabase
+    const { data: tasks, error } = await getSupabase()
       .from('tasks')
       .select('*')
       .lte('reminder_date', now)
@@ -46,7 +47,7 @@ export async function GET(req: Request) {
 
     for (const task of tasks) {
       // Get user's push subscriptions
-      const { data: subs } = await supabase
+      const { data: subs } = await getSupabase()
         .from('push_subscriptions')
         .select('*')
         .eq('user_id', task.user_id);
@@ -68,13 +69,13 @@ export async function GET(req: Request) {
             sentCount++;
           } catch {
             // Subscription expired — remove it
-            await supabase.from('push_subscriptions').delete().eq('id', sub.id);
+            await getSupabase().from('push_subscriptions').delete().eq('id', sub.id);
           }
         }
       }
 
       // Mark reminder as sent
-      await supabase
+      await getSupabase()
         .from('tasks')
         .update({ reminder_sent: true })
         .eq('id', task.id);

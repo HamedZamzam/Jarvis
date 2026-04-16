@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -18,6 +16,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Audio file too large (max 25MB)' }, { status: 400 });
     }
 
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const transcription = await openai.audio.transcriptions.create({
       model: 'whisper-1',
       file: audioFile,
