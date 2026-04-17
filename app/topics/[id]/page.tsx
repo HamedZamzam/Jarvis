@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { t } from '@/lib/i18n';
-import { getTasks, getTopics, updateTask, deleteTask } from '@/lib/queries';
+import { getTasks, getTopics, updateTask, deleteTask, createEntry, bulkCreateTasks } from '@/lib/queries';
 import { ArrowLeft } from 'lucide-react';
 import TaskList from '@/components/TaskList';
 import ShareButton from '@/components/ShareButton';
+import RecordButton from '@/components/RecordButton';
 import BottomNav from '@/components/BottomNav';
-import type { Task, Topic } from '@/lib/types';
+import type { Task, Topic, ExtractedTask } from '@/lib/types';
 
 export default function TopicDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -40,6 +41,30 @@ export default function TopicDetailPage() {
     };
     load();
   }, [user, supabase, id]);
+
+  const handleTasksExtracted = useCallback(
+    async (extracted: ExtractedTask[], transcript: string) => {
+      if (!user || !id) return;
+
+      try {
+        const entry = await createEntry(supabase, user.id, id, transcript, lang);
+        const taskRows = extracted.map((et) => ({
+          user_id: user.id,
+          entry_id: entry.id,
+          topic_id: id,
+          title: et.title,
+          description: et.description,
+          assignee: et.assignee,
+          due_date: et.due_date,
+        }));
+        const newTasks = await bulkCreateTasks(supabase, taskRows);
+        setTasks((prev) => [...newTasks, ...prev]);
+      } catch (err) {
+        console.error('Failed to save tasks:', err);
+      }
+    },
+    [user, supabase, id, lang]
+  );
 
   const handleUpdate = async (taskId: string, updates: Partial<Task>) => {
     try {
@@ -85,11 +110,13 @@ export default function TopicDetailPage() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-4">
-        <TaskList
-          tasks={tasks}
-          onUpdate={handleUpdate}
-          onDelete={handleDelete}
-        />
+        {/* Record button — auto-saves to this topic */}
+        <div className="py-6 mb-4 rounded-2xl bg-[var(--card)] border border-[var(--border)]">
+          <RecordButton language={lang} onTasksExtracted={handleTasksExtracted} />
+        </div>
+
+        {/* Tasks for this topic */}
+        <TaskList tasks={tasks} onUpdate={handleUpdate} onDelete={handleDelete} />
       </main>
 
       <BottomNav />

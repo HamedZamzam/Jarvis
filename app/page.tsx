@@ -51,19 +51,17 @@ export default function HomePage() {
     if (!user) return;
 
     try {
-      // Create entry
-      const entry = await createEntry(
-        supabase,
-        user.id,
-        selectedTopicId || '',
-        transcript,
-        lang
-      );
+      // Create entry (only if a topic is selected — entry needs a topic_id)
+      let entryId: string | undefined;
+      if (selectedTopicId) {
+        const entry = await createEntry(supabase, user.id, selectedTopicId, transcript, lang);
+        entryId = entry.id;
+      }
 
       // Create tasks
       const taskRows = extracted.map((et) => ({
         user_id: user.id,
-        entry_id: entry.id,
+        entry_id: entryId,
         topic_id: selectedTopicId || undefined,
         title: et.title,
         description: et.description,
@@ -163,13 +161,19 @@ export default function HomePage() {
           />
         </div>
 
-        {/* Recent Tasks */}
+        {/* Recent Tasks — filtered by selected topic if any */}
         <div className="mt-4">
           <h2 className="text-lg font-semibold mb-3">
-            {t(lang, 'nav.tasks')}
+            {selectedTopicId
+              ? topics.find((tp) => tp.id === selectedTopicId)?.name
+              : t(lang, 'nav.tasks')}
           </h2>
           <TaskList
-            tasks={recentTasks}
+            tasks={
+              selectedTopicId
+                ? tasks.filter((t) => t.topic_id === selectedTopicId)
+                : recentTasks
+            }
             onUpdate={handleUpdateTask}
             onDelete={handleDeleteTask}
             showFilters={false}
