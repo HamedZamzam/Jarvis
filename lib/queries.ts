@@ -77,6 +77,16 @@ export async function getTasks(
   return data as Task[];
 }
 
+export async function getTask(supabase: SupabaseClient, id: string) {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error) throw error;
+  return data as Task;
+}
+
 export async function createTask(
   supabase: SupabaseClient,
   task: {
